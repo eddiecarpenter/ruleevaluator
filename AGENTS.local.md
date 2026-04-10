@@ -7,30 +7,23 @@ This file is never overwritten by a template sync.
 
 ---
 
-<!-- Add local rules below this line -->
+## Template Source
 
-## GitHub Actions Sync
+Template: eddiecarpenter/ai-native-delivery
 
-This is the `ai-native-delivery` template repo. Unlike downstream repos, there is no
-upstream to sync from — `.github/workflows/` must be kept in sync with `base/.github/workflows/`
-manually whenever a workflow file is added or changed.
+## Project
 
-**After any change to `base/.github/workflows/`:**
-```bash
-cp base/.github/workflows/<changed-file>.yml .github/workflows/<changed-file>.yml
-git add .github/workflows/<changed-file>.yml
-git commit -m "chore: sync <changed-file>.yml from base/"
-```
+- **Name:** ruleevaluator
+- **Topology:** Single
+- **Stack:** Go
+- **Description:** A lightweight, zero-dependency Go library for evaluating dynamic expressions against arbitrary data structures, with support for nested field access, custom functions, and variable substitution.
 
-Check for drift at any time:
-```bash
-diff -r base/.github/workflows/ .github/workflows/
-```
+## Repo
 
----
+- **GitHub:** https://github.com/eddiecarpenter/ruleevaluator
+- **Owner:** eddiecarpenter
 
-## Local Skills
+## Skills
 
-Local skills for this repo live in `skills/`. See `skills/release.md` for the release process.
-
-<!-- Pipeline smoke test — issue #132 -->
+The `skills/` directory is for local project-specific skills that extend
+or override template skills in `base/skills/`.
