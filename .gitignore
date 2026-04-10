@@ -10,3 +10,7 @@
 # Add a new line here whenever a new type is introduced
 domains/*/
 tools/*/
+
+# SonarQube scanner working directory and coverage output
+.scannerwork/
+coverage.out
