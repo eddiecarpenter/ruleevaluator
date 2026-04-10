@@ -365,57 +365,67 @@ func tryMergeIsNot(expr string, i int) (newI int, merged bool) {
 	return k, true
 }
 
+// scanSingleCharToken handles single-character tokens and comma separators.
+// Returns (tok, skip, ok): skip means the character is a separator with no token emitted.
+func scanSingleCharToken(ch byte) (tok string, skip bool, ok bool) {
+	switch ch {
+	case '(', ')', '>', '<', '!', '?', ':':
+		return string(ch), false, true
+	case ',':
+		return "", true, true
+	}
+	return "", false, false
+}
+
+// tokenizeIdentifier scans an identifier/keyword/number token and handles the "is not" merge.
+func tokenizeIdentifier(expression string, i int) (tok string, newI int, err error) {
+	word, newI := scanWord(expression, i)
+	if newI == i {
+		return "", i, fmt.Errorf("unexpected character: %q", expression[i])
+	}
+	if word == "is" {
+		if mergedI, ok := tryMergeIsNot(expression, newI); ok {
+			return "is not", mergedI, nil
+		}
+	}
+	return word, newI, nil
+}
+
+// tokenizeStep advances position i by one token and returns it.
+// An empty token with no error means a separator was consumed (e.g. comma).
+func tokenizeStep(expression string, i int) (tok string, newI int, err error) {
+	if isSpace(expression[i]) {
+		return "", i + 1, nil
+	}
+	if tok, adv, ok := scanTwoCharOp(expression, i); ok {
+		return tok, i + adv, nil
+	}
+	ch := expression[i]
+	if tok, skip, ok := scanSingleCharToken(ch); ok {
+		if skip {
+			return "", i + 1, nil
+		}
+		return tok, i + 1, nil
+	}
+	if ch == '\'' || ch == '"' {
+		tok, newI, err := scanStringLiteral(expression, i)
+		return tok, newI, err
+	}
+	return tokenizeIdentifier(expression, i)
+}
+
 func tokenize(expression string) ([]string, error) {
 	tokens := make([]string, 0, 32)
-
 	for i := 0; i < len(expression); {
-		if isSpace(expression[i]) {
-			i++
-			continue
+		tok, newI, err := tokenizeStep(expression, i)
+		if err != nil {
+			return nil, err
 		}
-
-		if tok, adv, ok := scanTwoCharOp(expression, i); ok {
+		if tok != "" {
 			tokens = append(tokens, tok)
-			i += adv
-			continue
-		}
-
-		ch := expression[i]
-		switch ch {
-		case '(', ')', '>', '<', '!', '?', ':':
-			tokens = append(tokens, string(ch))
-			i++
-			continue
-		case ',':
-			i++
-			continue
-		case '\'', '"':
-			tok, newI, err := scanStringLiteral(expression, i)
-			if err != nil {
-				return nil, err
-			}
-			tokens = append(tokens, tok)
-			i = newI
-			continue
-		}
-
-		word, newI := scanWord(expression, i)
-		if newI == i {
-			return nil, fmt.Errorf("unexpected character: %q", expression[i])
 		}
 		i = newI
-
-		if word == "is" {
-			if mergedI, ok := tryMergeIsNot(expression, i); ok {
-				tokens = append(tokens, "is not")
-				i = mergedI
-				continue
-			}
-		}
-
-		tokens = append(tokens, word)
 	}
-
 	return tokens, nil
 }
 
@@ -554,27 +564,20 @@ func applySliceIndex(cur any, idx int) (any, bool) {
 	}
 }
 
-// walkPathStep resolves a single dot-separated path segment against cur.
-// Returns (nil, nil) for any missing field, key, or out-of-bounds index — never an error.
-func walkPathStep(cur any, rawPart string, vars map[string]any) (any, error) {
-	// $var part: substitute the variable as the new current object.
-	if len(rawPart) > 0 && rawPart[0] == '$' {
-		if vars == nil {
-			return nil, nil
-		}
-		v, ok := vars[rawPart]
-		if !ok {
-			return nil, nil
-		}
-		return v, nil
+// resolveVarSegment looks up a $variable in vars, returning nil if absent.
+func resolveVarSegment(rawPart string, vars map[string]any) (any, error) {
+	if vars == nil {
+		return nil, nil
 	}
-
-	name, hasIdx, idxSpec, err := parsePart(rawPart)
-	if err != nil {
-		return nil, err
+	v, ok := vars[rawPart]
+	if !ok {
+		return nil, nil
 	}
+	return v, nil
+}
 
-	// Resolve named field or map key.
+// resolveFieldSegment resolves a named field and optional index against cur.
+func resolveFieldSegment(cur any, name string, vars map[string]any, hasIdx bool, idxSpec string) (any, error) {
 	if name != "" {
 		cv := deref(reflect.ValueOf(cur))
 		if !cv.IsValid() {
@@ -587,23 +590,35 @@ func walkPathStep(cur any, rawPart string, vars map[string]any) (any, error) {
 		cur = val
 	}
 
-	// Apply array/slice index if present.
-	if hasIdx {
-		idx, err := toIndex(idxSpec, vars)
-		if err != nil {
-			return nil, err
-		}
-		if cur == nil {
-			return nil, nil
-		}
-		val, ok := applySliceIndex(cur, idx)
-		if !ok {
-			return nil, nil
-		}
-		cur = val
+	if !hasIdx {
+		return cur, nil
 	}
 
-	return cur, nil
+	idx, err := toIndex(idxSpec, vars)
+	if err != nil {
+		return nil, err
+	}
+	if cur == nil {
+		return nil, nil
+	}
+	val, ok := applySliceIndex(cur, idx)
+	if !ok {
+		return nil, nil
+	}
+	return val, nil
+}
+
+// walkPathStep resolves a single dot-separated path segment against cur.
+// Returns (nil, nil) for any missing field, key, or out-of-bounds index — never an error.
+func walkPathStep(cur any, rawPart string, vars map[string]any) (any, error) {
+	if len(rawPart) > 0 && rawPart[0] == '$' {
+		return resolveVarSegment(rawPart, vars)
+	}
+	name, hasIdx, idxSpec, err := parsePart(rawPart)
+	if err != nil {
+		return nil, err
+	}
+	return resolveFieldSegment(cur, name, vars, hasIdx, idxSpec)
 }
 
 func (e *RuleEvaluator) getFieldValue(field string, vars map[string]any) (any, error) {
