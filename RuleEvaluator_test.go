@@ -538,6 +538,100 @@ func TestRuleEvaluator_PointerFields(t *testing.T) {
 	}
 }
 
+func TestRuleEvaluator_ErrorPaths(t *testing.T) {
+	ev := newEvaluatorFixture()
+
+	cases := []struct {
+		name string
+		expr string
+	}{
+		// compare: incomparable type (int vs bool)
+		{"compare incompatible types", "m.b == m.i"},
+		// processUnaryNot: insufficient values
+		{"not insufficient", "!"},
+		// parsePart: missing closing bracket
+		{"missing closing bracket", "arr[0"},
+		// parsePart: empty index
+		{"empty index", "arr[]"},
+		// toIndex: invalid literal
+		{"invalid literal index", "arr[x]"},
+		// toIndex: $var not found
+		{"var index not found", "arr[$missing]"},
+		// getFieldValue: empty expression
+		{"empty expression", ""},
+		// applySliceIndex on non-slice — returns nil, not error (covered separately)
+		// unterminated double-quoted string
+		{"unterminated double-quote string", `"abc`},
+		// processFunc: function missing marker (stack exhausted before finding marker)
+		{"func marker missing", "startsWith('a')"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ev.Evaluate(tc.expr)
+			if err == nil {
+				t.Fatalf("expected error for %q, got nil", tc.expr)
+			}
+		})
+	}
+}
+
+func TestRuleEvaluator_NilPointerDeref(t *testing.T) {
+	type Inner struct {
+		Value string
+	}
+	type WithNilPtr struct {
+		Inner *Inner
+	}
+	// nil pointer to a struct — accessing a field beneath it should return nil
+	ev := NewRuleEvaluator(WithNilPtr{Inner: nil})
+
+	got, err := ev.Evaluate("inner.value")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != nil {
+		t.Fatalf("expected nil for field access through nil pointer, got %#v", got)
+	}
+}
+
+func TestRuleEvaluator_ApplySliceIndex_NonSlice(t *testing.T) {
+	ev := newEvaluatorFixture()
+	// m.foo is a string — indexing it returns nil, not an error
+	got, err := ev.Evaluate("m.foo[0]")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != nil {
+		t.Fatalf("expected nil for index on non-slice, got %#v", got)
+	}
+}
+
+func TestRuleEvaluator_VarIndexErrors(t *testing.T) {
+	type Container struct {
+		Items []string
+	}
+	ev := NewRuleEvaluator(Container{Items: []string{"a", "b"}})
+
+	// $var with nil vars map
+	_, err := ev.EvaluateWithVars("items[$i]", nil)
+	if err == nil {
+		t.Fatal("expected error for nil vars with $var index")
+	}
+
+	// varToInt with unsupported type
+	_, err = ev.EvaluateWithVars("items[$i]", map[string]any{"$i": struct{}{}})
+	if err == nil {
+		t.Fatal("expected error for unsupported index variable type")
+	}
+
+	// varToInt with non-numeric string
+	_, err = ev.EvaluateWithVars("items[$i]", map[string]any{"$i": "abc"})
+	if err == nil {
+		t.Fatal("expected error for non-numeric string index variable")
+	}
+}
+
 func TestRuleEvaluator_OrderedOp_FloatAndString(t *testing.T) {
 	ev := newEvaluatorFixture()
 
