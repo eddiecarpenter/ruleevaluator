@@ -1,6 +1,6 @@
 # ruleevaluator
 
-[![CI](https://github.com/eddiecarpenter/ruleevaluator/actions/workflows/sonarcloud.yml/badge.svg)](https://github.com/eddiecarpenter/ruleevaluator/actions/workflows/sonarcloud.yml)
+[![CI](https://github.com/eddiecarpenter/ruleevaluator/actions/workflows/ci.yml/badge.svg)](https://github.com/eddiecarpenter/ruleevaluator/actions/workflows/ci.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=eddiecarpenter_ruleevaluator&metric=alert_status&token=ec6fcfc05f08f5b08ba9c218aaeb7a6caadb7341)](https://sonarcloud.io/summary/new_code?id=eddiecarpenter_ruleevaluator)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=eddiecarpenter_ruleevaluator&metric=coverage)](https://sonarcloud.io/summary/new_code?id=eddiecarpenter_ruleevaluator)
 [![Go Report Card](https://goreportcard.com/badge/github.com/eddiecarpenter/ruleevaluator)](https://goreportcard.com/report/github.com/eddiecarpenter/ruleevaluator)
