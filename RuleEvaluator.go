@@ -1,3 +1,18 @@
+// Package ruleevaluator provides a lightweight, zero-dependency expression
+// evaluator for Go. Expressions are evaluated at runtime against an arbitrary
+// data object (struct, map, or slice), with support for nested field access,
+// array indexing, runtime variables, custom functions, and a full set of
+// comparison and logical operators.
+//
+// Basic usage:
+//
+//	ev := ruleevaluator.NewRuleEvaluator(myData)
+//	result, err := ev.Evaluate("status == 'active' && score > 50")
+//
+// Variables and custom functions can be registered before evaluation:
+//
+//	ev.RegisterFunction("startsWith", func(args []any) (any, error) { ... })
+//	result, err := ev.EvaluateWithVars("name[$i].active", map[string]any{"$i": int64(0)})
 package ruleevaluator
 
 import (
