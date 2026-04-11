@@ -1,5 +1,11 @@
 # ruleevaluator
 
+[![Build](https://github.com/eddiecarpenter/ruleevaluator/actions/workflows/ci.yml/badge.svg)](https://github.com/eddiecarpenter/ruleevaluator/actions/workflows/ci.yml)
+[![Latest Release](https://img.shields.io/github/v/release/eddiecarpenter/ruleevaluator)](https://github.com/eddiecarpenter/ruleevaluator/releases/latest)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=eddiecarpenter_ruleevaluator&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=eddiecarpenter_ruleevaluator)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/eddiecarpenter/ruleevaluator)](go.mod)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A lightweight, zero-dependency Go library for evaluating dynamic expressions against arbitrary data structures. It supports nested field access on structs and maps, array indexing, runtime variables, custom functions, and a full set of comparison and logical operators — all parsed and evaluated at runtime with no code generation or reflection overhead beyond what Go's standard library provides.
 
 ## Contents

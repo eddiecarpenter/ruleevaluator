@@ -400,3 +400,171 @@ func TestRuleEvaluator_ErrorCases_Syntax(t *testing.T) {
 		})
 	}
 }
+
+func TestRuleEvaluator_IsIsNot(t *testing.T) {
+	ev := newEvaluatorFixture()
+
+	cases := []struct {
+		name string
+		expr string
+		want any
+	}{
+		{"is null true", "null is null", true},
+		{"is null false", "'x' is null", false},
+		{"is not null true", "'x' is not null", true},
+		{"is not null false", "null is not null", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ev.Evaluate(tc.expr)
+			if err != nil {
+				t.Fatalf("Evaluate(%q) err=%v", tc.expr, err)
+			}
+			if got != tc.want {
+				t.Fatalf("Evaluate(%q)=%#v, want %#v", tc.expr, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRuleEvaluator_BoolComparisons(t *testing.T) {
+	ev := newEvaluatorFixture()
+
+	cases := []struct {
+		name    string
+		expr    string
+		want    any
+		wantErr bool
+	}{
+		{"bool gt (true > false)", "true > false", true, false},
+		{"bool lt (false < true)", "false < true", true, false},
+		{"bool ge (true >= true)", "true >= true", true, false},
+		{"bool le (false <= false)", "false <= false", true, false},
+		{"bool gt false (false > true)", "false > true", false, false},
+		{"bool ne (true != false)", "true != false", true, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ev.Evaluate(tc.expr)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Evaluate(%q) err=%v", tc.expr, err)
+			}
+			if got != tc.want {
+				t.Fatalf("Evaluate(%q)=%#v, want %#v", tc.expr, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRuleEvaluator_Variables_IntTypes(t *testing.T) {
+	type Container struct {
+		Items []string
+	}
+	container := Container{Items: []string{"zero", "one", "two"}}
+	ev := NewRuleEvaluator(container)
+
+	cases := []struct {
+		name  string
+		index any
+		want  any
+	}{
+		{"int index", int(1), "one"},
+		{"int8 index", int8(2), "two"},
+		{"int16 index", int16(0), "zero"},
+		{"int32 index", int32(1), "one"},
+		{"uint index", uint(2), "two"},
+		{"uint8 index", uint8(0), "zero"},
+		{"uint16 index", uint16(1), "one"},
+		{"uint32 index", uint32(2), "two"},
+		{"uint64 index", uint64(0), "zero"},
+		{"float32 index", float32(1), "one"},
+		{"float64 index", float64(2), "two"},
+		{"string index", "0", "zero"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ev.EvaluateWithVars("items[$i]", map[string]any{"$i": tc.index})
+			if err != nil {
+				t.Fatalf("EvaluateWithVars err=%v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("got=%#v, want=%#v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRuleEvaluator_PointerFields(t *testing.T) {
+	type WithPtr struct {
+		Name *string
+		Age  *int
+		Flag *bool
+	}
+
+	name := "Alice"
+	age := 42
+	flag := true
+
+	ev := NewRuleEvaluator(WithPtr{Name: &name, Age: &age, Flag: &flag})
+
+	cases := []struct {
+		name string
+		expr string
+		want any
+	}{
+		{"pointer string field", "name", "Alice"},
+		{"pointer bool field eq", "flag == true", true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ev.Evaluate(tc.expr)
+			if err != nil {
+				t.Fatalf("Evaluate(%q) err=%v", tc.expr, err)
+			}
+			if got != tc.want {
+				t.Fatalf("Evaluate(%q)=%#v, want %#v", tc.expr, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRuleEvaluator_OrderedOp_FloatAndString(t *testing.T) {
+	ev := newEvaluatorFixture()
+
+	cases := []struct {
+		name string
+		expr string
+		want any
+	}{
+		{"float gt", "2.0 > 1.0", true},
+		{"float lt", "0.5 < 1.0", true},
+		{"float ge", "1.0 >= 1.0", true},
+		{"float le", "0.5 <= 1.0", true},
+		{"float ne", "1.0 != 2.0", true},
+		{"string gt", "'b' > 'a'", true},
+		{"string ge", "'a' >= 'a'", true},
+		{"string ne", "'a' != 'b'", true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ev.Evaluate(tc.expr)
+			if err != nil {
+				t.Fatalf("Evaluate(%q) err=%v", tc.expr, err)
+			}
+			if got != tc.want {
+				t.Fatalf("Evaluate(%q)=%#v, want %#v", tc.expr, got, tc.want)
+			}
+		})
+	}
+}

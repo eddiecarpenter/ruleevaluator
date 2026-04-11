@@ -1,6 +1,5 @@
 package ruleevaluator
 
-
 type stack[T any] struct {
 	data []T
 }

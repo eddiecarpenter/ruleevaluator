@@ -11,7 +11,9 @@ const (
 // EvaluatorError is the typed error for rule evaluator failures.
 // Callers should use errors.As to inspect the Code and act accordingly.
 type EvaluatorError struct {
-	Code    ErrorCode
+	// Code identifies the category of the error.
+	Code ErrorCode
+	// Message is a human-readable description of the error.
 	Message string
 }
 
