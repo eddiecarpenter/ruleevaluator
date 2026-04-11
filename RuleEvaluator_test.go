@@ -662,3 +662,146 @@ func TestRuleEvaluator_OrderedOp_FloatAndString(t *testing.T) {
 		})
 	}
 }
+
+// TestRuleEvaluator_CompareNil covers the nil > / < / >= / <= error path.
+func TestRuleEvaluator_CompareNil_OrderedError(t *testing.T) {
+	ev := newEvaluatorFixture()
+	for _, expr := range []string{"null > 1", "null < 1", "null >= 1", "null <= 1"} {
+		_, err := ev.Evaluate(expr)
+		if err == nil {
+			t.Fatalf("expected error for %q", expr)
+		}
+	}
+}
+
+// TestRuleEvaluator_Compare_NilRight covers compare when right operand is nil.
+func TestRuleEvaluator_Compare_NilRight(t *testing.T) {
+	ev := newEvaluatorFixture()
+	got, err := ev.Evaluate("null == null")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != true {
+		t.Fatalf("expected true, got %#v", got)
+	}
+	got, err = ev.Evaluate("null != null")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != false {
+		t.Fatalf("expected false, got %#v", got)
+	}
+}
+
+// TestRuleEvaluator_Compare_UncomparableType covers the default case in compare.
+func TestRuleEvaluator_Compare_UncomparableType(t *testing.T) {
+	type Custom struct{ V int }
+	ev := NewRuleEvaluator(struct{ A, B Custom }{A: Custom{1}, B: Custom{1}})
+	_, err := ev.Evaluate("a == b")
+	if err == nil {
+		t.Fatal("expected error comparing uncomparable type")
+	}
+}
+
+// TestRuleEvaluator_ProcessTernary_NonBoolCondition covers the non-bool condition error.
+func TestRuleEvaluator_ProcessTernary_NonBoolCondition(t *testing.T) {
+	ev := newEvaluatorFixture()
+	_, err := ev.Evaluate("1 ? 'a' : 'b'")
+	if err == nil {
+		t.Fatal("expected error for non-bool ternary condition")
+	}
+}
+
+// TestRuleEvaluator_ProcessLogicalOp_InsufficientValues covers logical op error path.
+func TestRuleEvaluator_ProcessLogicalOp_InsufficientValues(t *testing.T) {
+	ev := newEvaluatorFixture()
+	_, err := ev.Evaluate("&& true")
+	if err == nil {
+		t.Fatal("expected error for insufficient values in logical op")
+	}
+}
+
+// TestRuleEvaluator_ScanStringLiteral_Escape covers the backslash escape path.
+func TestRuleEvaluator_ScanStringLiteral_Escape(t *testing.T) {
+	ev := newEvaluatorFixture()
+	got, err := ev.Evaluate(`'it\'s'`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != `it\'s` {
+		t.Fatalf("got %#v", got)
+	}
+}
+
+// TestRuleEvaluator_ResolveNamedField_NonStringMap covers map with non-string key.
+func TestRuleEvaluator_ResolveNamedField_NonStringMap(t *testing.T) {
+	ev := NewRuleEvaluator(struct{ M map[int]string }{M: map[int]string{1: "a"}})
+	got, err := ev.Evaluate("m.foo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != nil {
+		t.Fatalf("expected nil for non-string-keyed map, got %#v", got)
+	}
+}
+
+// TestRuleEvaluator_ResolveValue_UnknownToken covers the field-not-found path in resolveValue.
+func TestRuleEvaluator_ResolveValue_Tokens(t *testing.T) {
+	ev := newEvaluatorFixture()
+
+	cases := []struct {
+		name string
+		expr string
+		want any
+	}{
+		// resolveValue: is / is not push eq/ne operators
+		{"is null via field", "m.missingKey is null", true},
+		{"is not null via field", "m.foo is not null", true},
+		// processToken: || operator
+		{"or operator", "false || true", true},
+		// processToken: >= operator
+		{"ge operator", "2 >= 2", true},
+		// processToken: <= operator
+		{"le operator", "1 <= 2", true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ev.Evaluate(tc.expr)
+			if err != nil {
+				t.Fatalf("Evaluate(%q) err=%v", tc.expr, err)
+			}
+			if got != tc.want {
+				t.Fatalf("Evaluate(%q)=%#v, want %#v", tc.expr, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestRuleEvaluator_VarToInt_AllTypes exercises the remaining varToInt type branches via EvaluateWithVars.
+func TestRuleEvaluator_VarToInt_AllTypes(t *testing.T) {
+	type C struct{ Items []string }
+	ev := NewRuleEvaluator(C{Items: []string{"zero", "one", "two"}})
+
+	cases := []struct {
+		name  string
+		index any
+		want  string
+	}{
+		{"int32", int32(1), "one"},
+		{"uint32", uint32(2), "two"},
+		{"float32", float32(0), "zero"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ev.EvaluateWithVars("items[$i]", map[string]any{"$i": tc.index})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("got=%#v want=%#v", got, tc.want)
+			}
+		})
+	}
+}
