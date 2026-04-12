@@ -33,24 +33,21 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    # Do NOT add permissions: contents: write here.
+    # GITHUB_TOKEN must NOT be used to create or publish the release — events
+    # fired by GITHUB_TOKEN do not trigger downstream workflows, so release.yml
+    # would never run. GOOSE_AGENT_PAT is required for the release: published
+    # event to reach release.yml.
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - name: Create draft release
+      - name: Create and publish release
+        # Uses PAT so the release: published event triggers release.yml.
         run: |
           gh release create "${{ github.ref_name }}" \
             --title "Release ${{ github.ref_name }}" \
-            --notes "Generating release notes…" \
-            --draft
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: Publish release
-        run: |
-          gh release edit "${{ github.ref_name }}" --draft=false
+            --notes "Generating release notes…"
         env:
           GH_TOKEN: ${{ secrets.GOOSE_AGENT_PAT }}
 
