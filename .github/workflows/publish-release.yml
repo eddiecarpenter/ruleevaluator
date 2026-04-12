@@ -39,11 +39,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - name: Create GitHub release
+      - name: Create draft release
         run: |
           gh release create "${{ github.ref_name }}" \
             --title "Release ${{ github.ref_name }}" \
-            --notes "Generating release notes…"
+            --notes "Generating release notes…" \
+            --draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Publish release
+        run: |
+          gh release edit "${{ github.ref_name }}" --draft=false
         env:
           GH_TOKEN: ${{ secrets.GOOSE_AGENT_PAT }}
 
